@@ -1,0 +1,11 @@
+provider_tinkoff:
+  timeout_request: 1m
+  rate_limit_per_second: 5
+  days_with_empty_history: 7
+  history_depth: 10
+  day_offset:
+    days_for_history_1: 1
+    days_for_history_5: 1
+    days_for_history_15: 1
+    days_for_history_60: 7
+    days_for_history_1440: 365
