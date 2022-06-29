@@ -1,6 +1,10 @@
 package tinkoff
 
-import sdk "github.com/tinkoff/invest-api-go-sdk"
+import (
+	"algotrade_service/internal/model"
+
+	sdk "github.com/tinkoff/invest-api-go-sdk"
+)
 
 func AvailableIntervals() []sdk.CandleInterval {
 	return []sdk.CandleInterval{
@@ -40,6 +44,8 @@ func TimeFrameToInt(interval sdk.CandleInterval) int {
 	}
 }
 
+const div = 1e+09
+
 func NewCandle(candles []*sdk.Candle) *sdk.Candle {
 	candle := &sdk.Candle{
 		Figi:     candles[0].GetFigi(),
@@ -64,4 +70,34 @@ func NewCandle(candles []*sdk.Candle) *sdk.Candle {
 	candle.Volume = int64(volume)
 
 	return candle
+}
+
+func CandleToBar(candle sdk.Candle) model.Bar {
+	bar := model.Bar{}
+
+	price := float64(candle.GetOpen().GetNano()) / div
+	price += float64(candle.GetOpen().GetUnits())
+	bar.Open = price
+
+	price = float64(candle.GetClose().GetNano()) / div
+	price += float64(candle.GetClose().GetUnits())
+	bar.Close = price
+
+	price = float64(candle.GetHigh().GetNano()) / div
+	price += float64(candle.GetHigh().GetUnits())
+	bar.High = price
+
+	price = float64(candle.GetLow().GetNano()) / div
+	price += float64(candle.GetLow().GetUnits())
+	bar.Low = price
+
+	price = float64(candle.GetOpen().GetNano()) / div
+	price += float64(candle.GetOpen().GetUnits())
+	bar.Open = price
+
+	bar.Volume = candle.GetVolume()
+
+	bar.Timestamp = candle.GetTime().AsTime().Unix()
+
+	return bar
 }

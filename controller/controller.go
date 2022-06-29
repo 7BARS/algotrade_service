@@ -8,7 +8,9 @@ import (
 	"time"
 
 	config "algotrade_service/configs"
+	"algotrade_service/internal/provider"
 	"algotrade_service/internal/provider/tinkoff"
+	"algotrade_service/internal/store"
 	"algotrade_service/model"
 
 	sdk "github.com/tinkoff/invest-api-go-sdk"
@@ -25,7 +27,10 @@ type Controller struct {
 	SharesByTicker     map[string]*model.Share
 	SharesByFIGI       map[string]*model.Share
 
-	provider *tinkoff.GRPCWrap
+	// provider *tinkoff.GRPCWrap
+
+	store    store.Store
+	provider provider.Provider
 }
 
 func NewController(token string, cfg *config.Config, eventController *model.EventController) (*Controller, error) {
@@ -51,9 +56,9 @@ func NewController(token string, cfg *config.Config, eventController *model.Even
 	}, nil
 }
 
-const (
-	tokenEnv = "TINKOFF_TOKEN"
-)
+// const (
+// 	tokenEnv = "TINKOFF_TOKEN"
+// )
 
 func (c *Controller) Start() error {
 	ctx := context.TODO()
@@ -89,27 +94,28 @@ func (c *Controller) run(ctx context.Context, shares []*sdk.Share, streaming *ti
 		if share.Exchange != "SPB_MORNING" {
 			continue
 		}
-		history := make(map[sdk.CandleInterval][]*sdk.HistoricCandle)
-		for _, interval := range tinkoff.AvailableIntervals() {
-			candles, err := c.provider.GetCandles(
+		// history := make(map[sdk.CandleInterval][]*sdk.HistoricCandle)
+		for _, tf := range c.provider.AvailableIntervals() {
+			bars, err := c.provider.GetCandles(
 				ctx,
 				share.Figi,
-				interval,
+				tf,
 				to,
 				c.cfg.ProviderTinkoff.HistoryDepth,
-				c.cfg.ProviderTinkoff.DayOffset.GetDayOffset(interval),
 			)
 			if err != nil {
-				log.Printf("cannot get candles by ticker: %s, time frame: %s, error: %v", share.Ticker, sdk.CandleInterval_name[int32(interval)], err)
+				log.Printf("cannot get candles by ticker: %s, time frame: %s, error: %v", share.Ticker, sdk.CandleInterval_name[int32(tf)], err)
 				continue
 			}
-			history[interval] = candles
+			// history[interval] = candles
+
+			c.store.AppendBars(context.TODO(), share.Figi, share.Ticker, tf, bars)
 		}
-		_share := model.NewShare(*share, history, c.chOnUpdateByTicker)
-		c.rwmux.Lock()
-		c.SharesByTicker[share.Ticker] = _share
-		c.SharesByFIGI[share.Figi] = _share
-		c.rwmux.Unlock()
+		// _share := model.NewShare(*share, history, c.chOnUpdateByTicker)
+		// c.rwmux.Lock()
+		// c.SharesByTicker[share.Ticker] = _share
+		// c.SharesByFIGI[share.Figi] = _share
+		// c.rwmux.Unlock()
 
 		streaming.SubscribeCandles([]string{share.Figi}, sdk.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE)
 		log.Printf("ticker: %s, has full history and subscribed to streaming", share.Ticker)
@@ -118,19 +124,28 @@ func (c *Controller) run(ctx context.Context, shares []*sdk.Share, streaming *ti
 	return nil
 }
 
-func (c *Controller) runCandleStreaming(streaming *tinkoff.Streaming) {
+func (c *Controller) runCandleStreaming(ctx context.Context,streaming *tinkoff.Streaming) {
+	
 	for {
-		candle, err := streaming.RecvCandle()
-		if err != nil {
-			log.Println(err)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			candle, err := streaming.RecvCandle()
+			if err != nil {
+				log.Println(err)
+			}
+			if candle == nil || candle.Figi == "" {
+				continue
+			}
+			// c.rwmux.RLock()
+			// c.SharesByFIGI[candle.Figi].AddMinuteCandle(*candle)
+			log.Printf("new update candle for ticker: %s", c.SharesByFIGI[candle.Figi].Info.Ticker)
+			
+			c.store.AppendBars(ctx, candle.Figi, "", )
+			// c.rwmux.RUnlock()
 		}
-		if candle == nil || candle.Figi == "" {
-			continue
-		}
-		c.rwmux.RLock()
-		c.SharesByFIGI[candle.Figi].AddMinuteCandle(*candle)
-		log.Printf("new update candle for ticker: %s", c.SharesByFIGI[candle.Figi].Info.Ticker)
-		c.rwmux.RUnlock()
+		
 	}
 }
 

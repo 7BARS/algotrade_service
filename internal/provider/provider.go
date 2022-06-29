@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"algotrade_service/internal/model"
 	"context"
 	"time"
 
@@ -14,4 +15,9 @@ type Unary interface {
 type Streaming interface {
 	SubscribeCandles(figiList []string, interval sdk.SubscriptionInterval) error
 	UnsubscribeCandles(figiList []string, interval sdk.SubscriptionInterval) error
+}
+
+type Provider interface {
+	AvailableIntervals() []model.TimeFrame
+	GetCandles(ctx context.Context, figi string, tf model.TimeFrame, to time.Time, historyDepth int) (model.Bars, error)
 }
