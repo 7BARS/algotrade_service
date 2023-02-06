@@ -1,6 +1,7 @@
 package tinkoff
 
 import (
+	"algotrade_service/internal/model"
 	"fmt"
 
 	sdk "github.com/tinkoff/invest-api-go-sdk"
@@ -38,11 +39,15 @@ func (sc *Streaming) subscribeCandles(figiList []string, interval sdk.Subscripti
 	})
 }
 
-func (sc *Streaming) RecvCandle() (*sdk.Candle, error) {
+func (sc *Streaming) RecvCandle() (model.BarMsg, error) {
 	resp, err := sc.stream.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("error while streaming recv, err: %v", err)
+		return model.BarMsg{}, fmt.Errorf("error while streaming recv, err: %v", err)
 	}
+	candle := resp.GetCandle()
 
-	return resp.GetCandle(), nil
+	return model.BarMsg{
+		Figi: candle.GetFigi(),
+		Bar:  CandleToBar(*candle),
+	}, nil
 }

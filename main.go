@@ -5,57 +5,68 @@ import (
 	"os"
 
 	"algotrade_service/cmd"
-	config "algotrade_service/configs"
-	"algotrade_service/controller"
-	"algotrade_service/model"
-	"algotrade_service/view"
 )
 
 const dataFilePath = "./dataFile.json"
 
-const (
-	tokenEnv = "TINKOFF_TOKEN"
-)
+// const (
+// 	tokenEnv = "TINKOFF_TOKEN"
+// )
+// var tokenEnv = flag.String("token_env", "TINKOFF_TOKEN", "env where token is stored")
+// var configPath = flag.String("config", "", "config for application")
 
 func main() {
-	log.Println("service start")
-	args, err := cmd.ParseArgs()
+	// var configPath = flag.String("config", "", "config for application")
+	// flag.Parse()
+	// fmt.Println(configPath)
+	// flag.Parse()
+	// fmt.Println(configPath)
+	log.Println("service is starting")
+	c1 := cmd.RootCmd()
+	err := c1.Execute()
+	// err := cmd.Start()
 	if err != nil {
-		log.Printf("cannot parse cmd, err: %v", err)
+		log.Printf("error: %v", err)
 		os.Exit(1)
 	}
+	log.Println("service finished")
+	// args, err := cmd.ParseArgs()
+	// if err != nil {
+	// 	log.Printf("cannot parse cmd, err: %v", err)
+	// 	os.Exit(1)
+	// }
 
-	cfg, err := config.GetConfig(args.PathConfig)
-	if err != nil {
-		log.Printf("cannot get config, err: %v", err)
-		os.Exit(1)
-	}
+	// cfg, err := config.GetConfig(args.PathConfig)
+	// if err != nil {
+	// 	log.Printf("cannot get config, err: %v", err)
+	// 	os.Exit(1)
+	// }
 
-	eventController, err := model.NewEventController()
-	if err != nil {
-		log.Printf("cannot create event controller, err: %v", err)
-		os.Exit(1)
-	}
+	// eventController, err := model.NewEventController()
+	// if err != nil {
+	// 	log.Printf("cannot create event controller, err: %v", err)
+	// 	os.Exit(1)
+	// }
 
-	controller, err := controller.NewController(os.Getenv(tokenEnv), cfg, eventController)
-	if err != nil {
-		log.Printf("cannot cannot create controller, err: %v", err)
-		os.Exit(1)
-	}
+	// controller, err := controller.NewController(os.Getenv(tokenEnv), cfg, eventController)
+	// if err != nil {
+	// 	log.Printf("cannot cannot create controller, err: %v", err)
+	// 	os.Exit(1)
+	// }
 
-	err = controller.Start()
-	if err != nil {
-		log.Printf("cannot cannot start controllr, err: %v", err)
-		os.Exit(1)
-	}
+	// err = controller.Start()
+	// if err != nil {
+	// 	log.Printf("cannot cannot start controllr, err: %v", err)
+	// 	os.Exit(1)
+	// }
 
-	view := view.NewView(eventController)
-	err = view.Start()
-	if err != nil {
-		log.Printf("cannot cannot start view, err: %v", err)
-		os.Exit(1)
-	}
-	log.Println("service started")
+	// view := view.NewView(eventController)
+	// err = view.Start()
+	// if err != nil {
+	// 	log.Printf("cannot cannot start view, err: %v", err)
+	// 	os.Exit(1)
+	// }
+	// log.Println("service started")
 
 	// provider, err := tinkoff.NewGRPCWrap(
 	// 	args.Token,
@@ -140,5 +151,5 @@ func main() {
 	// 	controller.SaveToFile(dataFilePath)
 	// 	log.Printf("history for ticker: %s, was written in file: %s", share.Ticker, dataFilePath)
 	// }
-	log.Println("service finish")
+	// log.Println("service finish")
 }

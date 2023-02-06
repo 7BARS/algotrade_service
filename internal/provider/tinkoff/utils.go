@@ -1,6 +1,10 @@
 package tinkoff
 
-import sdk "github.com/tinkoff/invest-api-go-sdk"
+import (
+	"algotrade_service/internal/model"
+
+	sdk "github.com/tinkoff/invest-api-go-sdk"
+)
 
 func AvailableIntervals() []sdk.CandleInterval {
 	return []sdk.CandleInterval{
@@ -40,6 +44,8 @@ func TimeFrameToInt(interval sdk.CandleInterval) int {
 	}
 }
 
+const div = 1e+09
+
 func NewCandle(candles []*sdk.Candle) *sdk.Candle {
 	candle := &sdk.Candle{
 		Figi:     candles[0].GetFigi(),
@@ -64,4 +70,19 @@ func NewCandle(candles []*sdk.Candle) *sdk.Candle {
 	candle.Volume = int64(volume)
 
 	return candle
+}
+
+func CandleToBar(candle sdk.Candle) model.Bar {
+	return model.Bar{
+		Open:      exactFractionToFloat64(candle.GetOpen().GetUnits(), candle.GetOpen().GetNano()),
+		Close:     exactFractionToFloat64(candle.GetClose().GetUnits(), candle.GetClose().GetNano()),
+		High:      exactFractionToFloat64(candle.GetHigh().GetUnits(), candle.GetHigh().GetNano()),
+		Low:       exactFractionToFloat64(candle.GetLow().GetUnits(), candle.GetLow().GetNano()),
+		Volume:    candle.GetVolume(),
+		Timestamp: candle.GetTime().AsTime().Unix(),
+	}
+}
+
+func exactFractionToFloat64(integer int64, fraction int32) float64 {
+	return float64(fraction)/div + float64(integer)
 }

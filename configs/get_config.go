@@ -1,10 +1,9 @@
 package config
 
 import (
+	"algotrade_service/internal/pkg/utils"
 	"fmt"
 	"io/ioutil"
-	
-	"algotrade_service/internal/utils"
 
 	"gopkg.in/yaml.v3"
 )

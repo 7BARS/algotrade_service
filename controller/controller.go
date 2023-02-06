@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	config "algotrade_service/configs"
+	"algotrade_service/internal/model"
 	"algotrade_service/internal/provider/tinkoff"
-	"algotrade_service/model"
+	"algotrade_service/internal/store"
 
 	sdk "github.com/tinkoff/invest-api-go-sdk"
 )
@@ -18,17 +18,20 @@ type Controller struct {
 	cfg   *config.Config
 	token string
 
-	eventController *model.EventController
+	// eventController *model.EventController
 
 	chOnUpdateByTicker chan string
 	rwmux              *sync.RWMutex
-	SharesByTicker     map[string]*model.Share
-	SharesByFIGI       map[string]*model.Share
+	// SharesByTicker     map[string]*model.Share
+	// SharesByFIGI       map[string]*model.Share
 
-	provider *tinkoff.GRPCWrap
+	// provider *tinkoff.GRPCWrap
+
+	store    store.Store
+	provider *tinkoff.GRPCWrap //provider.Provider
 }
 
-func NewController(token string, cfg *config.Config, eventController *model.EventController) (*Controller, error) {
+func NewController(token string, cfg *config.Config /* eventController *model.EventController */) (*Controller, error) {
 	provider, err := tinkoff.NewGRPCWrap(
 		token,
 		cfg.ProviderTinkoff.RateLimitPerSecond,
@@ -44,31 +47,31 @@ func NewController(token string, cfg *config.Config, eventController *model.Even
 		cfg:                cfg,
 		rwmux:              &sync.RWMutex{},
 		chOnUpdateByTicker: make(chan string, 100),
-		SharesByTicker:     make(map[string]*model.Share),
-		SharesByFIGI:       make(map[string]*model.Share),
-		eventController:    eventController,
-		provider:           provider,
+		// SharesByTicker:     make(map[string]*model.Share),
+		// SharesByFIGI:       make(map[string]*model.Share),
+		// eventController: eventController,
+		provider: provider,
 	}, nil
 }
 
-const (
-	tokenEnv = "TINKOFF_TOKEN"
-)
+// const (
+// 	tokenEnv = "TINKOFF_TOKEN"
+// )
 
 func (c *Controller) Start() error {
-	ctx := context.TODO()
-	shares, err := c.provider.GetSharesBase(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot get shares, err: %v", err)
-	}
+	// ctx := context.TODO()
+	// shares, err := c.provider.GetSharesBase(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("cannot get shares, err: %v", err)
+	// }
 
-	streaming, err := c.provider.NewStreaming(ctx)
-	if err != nil {
-		return fmt.Errorf("cannot get shares, err: %v", err)
-	}
-	go c.runCandleStreaming(streaming)
-	go c.run(ctx, shares, streaming)
-	go c.runEventTrigger(streaming)
+	// streaming, err := c.provider.NewStreaming(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("cannot get shares, err: %v", err)
+	// }
+	// go c.runCandleStreaming(streaming)
+	// go c.run(ctx, shares, streaming)
+	// go c.runEventTrigger(streaming)
 
 	return nil
 }
@@ -78,59 +81,69 @@ func (c *Controller) Stop() {
 }
 
 func (c *Controller) run(ctx context.Context, shares []*sdk.Share, streaming *tinkoff.Streaming) error {
-	to := time.Now()
-	figi := []string{}
-	for _, share := range shares {
-		figi = append(figi, share.Figi)
-	}
-	streaming.UnsubscribeCandles(figi, sdk.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE)
+	// to := time.Now()
+	// figi := []string{}
+	// for _, share := range shares {
+	// 	figi = append(figi, share.Figi)
+	// }
+	// streaming.UnsubscribeCandles(figi, sdk.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE)
 
-	for _, share := range shares {
-		if share.Exchange != "SPB_MORNING" {
-			continue
-		}
-		history := make(map[sdk.CandleInterval][]*sdk.HistoricCandle)
-		for _, interval := range tinkoff.AvailableIntervals() {
-			candles, err := c.provider.GetCandles(
-				ctx,
-				share.Figi,
-				interval,
-				to,
-				c.cfg.ProviderTinkoff.HistoryDepth,
-				c.cfg.ProviderTinkoff.DayOffset.GetDayOffset(interval),
-			)
-			if err != nil {
-				log.Printf("cannot get candles by ticker: %s, time frame: %s, error: %v", share.Ticker, sdk.CandleInterval_name[int32(interval)], err)
-				continue
-			}
-			history[interval] = candles
-		}
-		_share := model.NewShare(*share, history, c.chOnUpdateByTicker)
-		c.rwmux.Lock()
-		c.SharesByTicker[share.Ticker] = _share
-		c.SharesByFIGI[share.Figi] = _share
-		c.rwmux.Unlock()
+	// for _, share := range shares {
+	// 	if share.Exchange != "SPB_MORNING" {
+	// 		continue
+	// 	}
+	// 	// history := make(map[sdk.CandleInterval][]*sdk.HistoricCandle)
+	// 	for _, tf := range c.provider.AvailableIntervals() {
+	// 		bars, err := c.provider.GetCandles(
+	// 			ctx,
+	// 			share.Figi,
+	// 			tf,
+	// 			to,
+	// 			c.cfg.ProviderTinkoff.HistoryDepth,
+	// 		)
+	// 		if err != nil {
+	// 			log.Printf("cannot get candles by ticker: %s, time frame: %s, error: %v", share.Ticker, sdk.CandleInterval_name[int32(tf)], err)
+	// 			continue
+	// 		}
+	// 		// history[interval] = candles
 
-		streaming.SubscribeCandles([]string{share.Figi}, sdk.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE)
-		log.Printf("ticker: %s, has full history and subscribed to streaming", share.Ticker)
-	}
+	// 		c.store.AppendBars(context.TODO(), share.Figi, share.Ticker, tf, bars)
+	// 	}
+	// 	// _share := model.NewShare(*share, history, c.chOnUpdateByTicker)
+	// 	// c.rwmux.Lock()
+	// 	// c.SharesByTicker[share.Ticker] = _share
+	// 	// c.SharesByFIGI[share.Figi] = _share
+	// 	// c.rwmux.Unlock()
+
+	// 	streaming.SubscribeCandles([]string{share.Figi}, sdk.SubscriptionInterval_SUBSCRIPTION_INTERVAL_ONE_MINUTE)
+	// 	log.Printf("ticker: %s, has full history and subscribed to streaming", share.Ticker)
+	// }
 
 	return nil
 }
 
-func (c *Controller) runCandleStreaming(streaming *tinkoff.Streaming) {
+func (c *Controller) runCandleStreaming(ctx context.Context, streaming *tinkoff.Streaming) {
+
 	for {
-		candle, err := streaming.RecvCandle()
-		if err != nil {
-			log.Println(err)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			barMsg, err := streaming.RecvCandle()
+			if err != nil {
+				log.Println(err)
+			}
+			if barMsg.IsEmpty() {
+				continue
+			}
+			// c.rwmux.RLock()
+			// c.SharesByFIGI[candle.Figi].AddMinuteCandle(*candle)
+			// log.Printf("new update candle for ticker: %s", c.SharesByFIGI[barMsg.Figi].Info.Ticker)
+
+			c.store.AppendBars(ctx, barMsg.Figi, barMsg.Ticker, model.TimeFrame(barMsg.Bar.Timestamp), model.Bars{barMsg.Bar})
+			// c.rwmux.RUnlock()
 		}
-		if candle == nil || candle.Figi == "" {
-			continue
-		}
-		c.rwmux.RLock()
-		c.SharesByFIGI[candle.Figi].AddMinuteCandle(*candle)
-		log.Printf("new update candle for ticker: %s", c.SharesByFIGI[candle.Figi].Info.Ticker)
-		c.rwmux.RUnlock()
+
 	}
 }
 
@@ -148,60 +161,60 @@ const (
 )
 
 func (c *Controller) checkEvent(ticker string) {
-	c.rwmux.RLock()
-	defer c.rwmux.RUnlock()
+	// c.rwmux.RLock()
+	// defer c.rwmux.RUnlock()
 
-	// in first line check specific symbols
-	// than any
-	for _, events := range c.eventController.GetEvents() {
-		trigger := true
-		for ticker, eventAND := range events.EventsAND {
-			if ticker == specialTickerANY {
-				continue
-			}
-			if !c.checkEventByShare(eventAND, ticker) {
-				trigger = false
-				break
-			}
-		}
-		if !trigger {
-			continue
-		}
-		for _ticker := range c.SharesByTicker {
-			trigger := true
-			for ticker, eventAND := range events.EventsAND {
-				if ticker != specialTickerANY {
-					continue
-				}
-				if !c.checkEventByShare(eventAND, _ticker) {
-					trigger = false
-					break
-				}
-			}
-			if trigger {
-				log.Printf("want to buy ticker: %v", _ticker)
-			}
-		}
+	// // in first line check specific symbols
+	// // than any
+	// for _, events := range c.eventController.GetEvents() {
+	// 	trigger := true
+	// 	for ticker, eventAND := range events.EventsAND {
+	// 		if ticker == specialTickerANY {
+	// 			continue
+	// 		}
+	// 		if !c.checkEventByShare(eventAND, ticker) {
+	// 			trigger = false
+	// 			break
+	// 		}
+	// 	}
+	// 	if !trigger {
+	// 		continue
+	// 	}
+	// 	for _ticker := range c.SharesByTicker {
+	// 		trigger := true
+	// 		for ticker, eventAND := range events.EventsAND {
+	// 			if ticker != specialTickerANY {
+	// 				continue
+	// 			}
+	// 			if !c.checkEventByShare(eventAND, _ticker) {
+	// 				trigger = false
+	// 				break
+	// 			}
+	// 		}
+	// 		if trigger {
+	// 			log.Printf("want to buy ticker: %v", _ticker)
+	// 		}
+	// 	}
 
-	}
+	// }
 }
 
 func (c *Controller) checkEventByShare(events []model.Event, ticker string) bool {
-	share, ok := c.SharesByTicker[ticker]
-	if !ok {
-		return false
-	}
-	for _, event := range events {
-		ok, err := share.CheckEvent(&event)
-		if err != nil {
-			log.Printf("cannot check event by ticker: %s, error: %v", ticker, err)
-			return false
-		}
-		if !ok {
-			log.Printf("event: %s does not match to ticker: %s", event.Name, ticker)
-			return false
-		}
-	}
+	// share, ok := c.SharesByTicker[ticker]
+	// if !ok {
+	// 	return false
+	// }
+	// for _, event := range events {
+	// 	ok, err := share.CheckEvent(&event)
+	// 	if err != nil {
+	// 		log.Printf("cannot check event by ticker: %s, error: %v", ticker, err)
+	// 		return false
+	// 	}
+	// 	if !ok {
+	// 		log.Printf("event: %s does not match to ticker: %s", event.Name, ticker)
+	// 		return false
+	// 	}
+	// }
 
 	return true
 }

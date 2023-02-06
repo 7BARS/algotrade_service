@@ -1,24 +1,19 @@
 package cmd
 
 import (
-	"flag"
-	"fmt"
+	"github.com/spf13/cobra"
+
+	"algotrade_service/cmd/engine"
 )
 
-type CMDArgs struct {
-	PathConfig string
-}
-
-var pathConfig = flag.String("config", "", "config for application")
-
-func ParseArgs() (*CMDArgs, error) {
-	flag.Parse()
-
-	if *pathConfig == "" {
-		return nil, fmt.Errorf("arguments should not be empty, config: %s", *pathConfig)
+func RootCmd() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:     "version",
+		Short:   "run algotrade service",
+		Version: "0.1",
 	}
+	engineCmd := engine.New()
+	rootCmd.AddCommand(engineCmd.GetCmd())
 
-	return &CMDArgs{
-		PathConfig: *pathConfig,
-	}, nil
+	return rootCmd
 }

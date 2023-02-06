@@ -22,6 +22,7 @@ const (
 
 type Indicator interface {
 	Calc(candles map[sdk.CandleInterval][]*sdk.HistoricCandle) (float64, error)
+	// GetHistoryParams() 
 }
 
 func NewIndicator(typeOfIndicator string, args []string) (Indicator, error) {
